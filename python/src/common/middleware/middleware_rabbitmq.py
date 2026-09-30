@@ -54,7 +54,6 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
         return
 
     def stop_consuming(self):
-        self.channel.stop_consuming()
         try:
             self.channel.stop_consuming()
         except Exception as e:

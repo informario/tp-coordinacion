@@ -1,5 +1,6 @@
 import os
 import logging
+import signal
 
 from common import middleware, message_protocol, fruit_item
 
@@ -22,6 +23,17 @@ class SumFilter:
             )
             self.data_output_exchanges.append(data_output_exchange)
         self.amount_by_client = {}
+
+    def handle_sigterm(self, signum, frame):
+        try:
+            self.input_queue.stop_consuming()
+        except Exception as error:
+            logging.error(f"handling SIGTERM error: {error}")
+
+    def close(self):
+        self.input_queue.close()
+        for data_output_exchange in self.data_output_exchanges:
+            data_output_exchange.close()
 
     def _process_data(self, client_name, fruit, amount):
         logging.info(f"Process data")
@@ -81,7 +93,11 @@ class SumFilter:
 def main():
     logging.basicConfig(level=logging.INFO)
     sum_filter = SumFilter()
-    sum_filter.start()
+    signal.signal(signal.SIGTERM, sum_filter.handle_sigterm)
+    try:
+        sum_filter.start()
+    finally:
+        sum_filter.close()
     return 0
 
 
