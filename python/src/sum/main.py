@@ -38,9 +38,10 @@ class SumFilter:
         logging.info(f"broadcasting data messages from {client_name}")
         amount_by_fruit = self.amount_by_client.pop(client_name, {})
         for final_fruit_item in amount_by_fruit.values():
+            aggregation_index = self._aggregation_index(client_name,final_fruit_item.fruit)
             message = message_protocol.internal.serialize([client_name,final_fruit_item.fruit,final_fruit_item.amount])
-            for data_output_exchange in self.data_output_exchanges:
-                data_output_exchange.send(message)
+            #reparto los cosos en funcion del "hash"
+            self.data_output_exchanges[aggregation_index].send(message)
         eof_message = message_protocol.internal.serialize([client_name])
         for data_output_exchange in self.data_output_exchanges:
             data_output_exchange.send(eof_message)
@@ -51,6 +52,11 @@ class SumFilter:
         for control_output_queue in self.control_output_queues:
             control_output_queue.send(eof_message)
 
+    def _aggregation_index(self, client_name, fruit):
+        key = f"{client_name}\0{fruit}"
+        return sum(ord(character) for character in key) % AGGREGATION_AMOUNT
+
+    #este es el callback de input queue
     def process_data_message(self, message, ack, nack):
         fields = message_protocol.internal.deserialize(message)
         if len(fields) == 3:
@@ -60,7 +66,7 @@ class SumFilter:
         else:
             raise ValueError("mensaje desconocido")
         ack()
-
+    #este es el calback de control input queue
     def process_control_message(self, message, ack, nack):
         fields = message_protocol.internal.deserialize(message)
         if len(fields) != 1:
